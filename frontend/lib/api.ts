@@ -18,6 +18,12 @@ export type SourceDocument = {
   media_type: string;
   size_bytes: number;
   status: "uploaded";
+  extraction_status:
+    "uploaded" | "processing" | "extracted" | "failed" | "needs_ocr";
+  extraction_error_message: string | null;
+  extraction_warnings: string[];
+  reviewed_at: string | null;
+  content_revision: number;
   created_at: string;
 };
 export class ApiError extends Error {
@@ -66,15 +72,17 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
 export async function downloadDocument(
   workspaceId: string,
   document: SourceDocument,
+  corrected = false,
 ) {
   const response = await request(
-    `/workspaces/${workspaceId}/documents/${document.id}/download`,
+    `/workspaces/${workspaceId}/documents/${document.id}/${corrected ? "content/download" : "download"}`,
   );
   const url = URL.createObjectURL(await response.blob());
   const anchor = window.document.createElement("a");
   anchor.href = url;
   anchor.download =
-    document.original_filename.replace(/\\/g, "/").split("/").pop() ||
+    (corrected ? "corrected-" : "") +
+      document.original_filename.replace(/\\/g, "/").split("/").pop() ||
     "document";
   window.document.body.appendChild(anchor);
   anchor.click();

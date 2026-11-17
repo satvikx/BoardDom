@@ -77,3 +77,44 @@ class DocumentOut(BaseModel):
     size_bytes: int
     status: Literal["uploaded"]
     created_at: datetime
+
+    extraction_status: Literal["uploaded", "processing", "extracted", "needs_ocr", "failed"]
+    extraction_error_code: str | None
+    extraction_error_message: str | None
+    extraction_warnings: list[str]
+    extracted_at: datetime | None
+    reviewed_at: datetime | None
+    reviewed_by_user_id: UUID | None
+    content_revision: int
+    extraction_attempt_id: str | None
+    extraction_started_at: datetime | None
+    extraction_finished_at: datetime | None
+
+
+class UnitOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    position: int
+    page_number: int | None
+    label: str
+    original_text: str
+    corrected_text: str | None
+    effective_text: str
+    revision: int
+
+
+class ContentOut(BaseModel):
+    document: DocumentOut
+    units: list[UnitOut]
+
+
+class UnitPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    corrected_text: str | None = Field(max_length=500000)
+    expected_revision: int = Field(ge=0, strict=True)
+
+
+class ReviewPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reviewed: bool
+    expected_content_revision: int = Field(ge=0, strict=True)

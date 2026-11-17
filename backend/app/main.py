@@ -6,9 +6,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.api import auth, documents, workspaces
+from app.api import auth, content, documents, workspaces
 from app.core.config import Settings
 from app.db.session import build_engine, session_factory
+from app.services.extraction import ExtractionWorker
 from app.services.storage import FileStorage
 
 logger = logging.getLogger(__name__)
@@ -20,13 +21,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app):
+        app.state.worker.recover()
         yield
+        app.state.worker.close()
         engine.dispose()
 
     app = FastAPI(title="Boardom", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.session_factory = session_factory(engine)
     app.state.storage = FileStorage(settings.resolved_upload_dir, settings.max_upload_bytes)
+
+    app.state.worker = ExtractionWorker(app.state.session_factory, app.state.storage, settings)
 
     @app.middleware("http")
     async def browser_security(request: Request, call_next):
@@ -68,7 +73,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Only the non-sensitive upload limit needed by the file picker.
         return {"max_upload_bytes": settings.max_upload_bytes}
 
-    for router in (auth.router, workspaces.router, documents.router):
+    for router in (auth.router, workspaces.router, documents.router, content.router):
         app.include_router(router, prefix="/api/v1")
     return app
 

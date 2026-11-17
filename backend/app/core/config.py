@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///data/boardom.db"
     upload_dir: Path = Path("data/uploads")
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
+    max_pdf_pages: int = Field(default=200, gt=0)
+    max_extracted_characters: int = Field(default=500000, gt=0)
+    extraction_timeout_seconds: float = Field(default=60, gt=0, le=600)
     session_lifetime_seconds: int = Field(default=7 * 24 * 60 * 60, gt=0)
     cookie_secure: bool = False
     frontend_origin: str = "http://localhost:3000"

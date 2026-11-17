@@ -93,7 +93,7 @@ function WorkspaceView({ id }: { id: string }) {
       setDocuments((current) => [document, ...current]);
       form.reset();
       setSuccess(
-        "Saved successfully. Content extraction will be added in the next layer.",
+        "Saved successfully. Open the source to extract and review its text.",
       );
     } catch (e) {
       setError(handleError(e));
@@ -245,7 +245,17 @@ function WorkspaceView({ id }: { id: string }) {
                           {formatSize(doc.size_bytes)} ·{" "}
                           {formatDate(doc.created_at)}
                         </p>
-                        <span className="status">Uploaded</span>
+                        <span className="status">
+                          {doc.extraction_status.replace("_", " ")} ·{" "}
+                          {doc.reviewed_at ? "Reviewed" : "Unreviewed"}
+                        </span>
+                        <p>
+                          <Link href={`/workspaces/${id}/documents/${doc.id}`}>
+                            {doc.extraction_status === "extracted"
+                              ? "Review text"
+                              : "Extract text / status"}
+                          </Link>
+                        </p>
                       </div>
                       <div className="document-actions">
                         <button
