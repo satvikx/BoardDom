@@ -1,93 +1,168 @@
 # Boardom
 
+A teacher’s workspace for lesson ideas and source materials.
 
+**Layer 1 is implemented:** email/password accounts, persistent sessions, lesson workspace CRUD, and private PDF/Markdown/text uploads, listings, downloads, and deletion. The frontend is Next.js App Router + TypeScript; the backend is FastAPI + synchronous SQLAlchemy, Alembic, and SQLite.
 
-## Getting started
+AI generation, content extraction, OCR, embeddings, vector search, slides, quizzes, and interactive activities are intentionally deferred. Documents remain **Uploaded**; they are not processed.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Requirements
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- Python **3.12+** (verified with 3.13.5).
+- Node.js **22.13+** (verified with 22.23.5) and npm.
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) for Python dependencies.
 
-## Add your files
+No API keys, Docker, paid services, or external database are needed. Exact resolved versions are recorded in `backend/uv.lock` and `frontend/package-lock.json`. Next.js installation requirements are documented [here](https://nextjs.org/docs/app/getting-started/installation); the Node requirement above also covers the lint tooling.
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Setup
 
+Run from the repository root:
+
+```bash
+cd backend
+cp .env.example .env
+uv sync --locked
+uv run alembic upgrade head
+cd ../frontend
+cp .env.example .env.local
+npm ci
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/personal-group7320947/boardom.git
-git branch -M main
-git push -uf origin main
+
+The migration creates the tables. The application never calls `create_all()`. If you change the database URL, run the migration for the new database before starting the API.
+
+## Run locally
+
+Terminal 1, from the repository root:
+
+```bash
+cd backend
+uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-## Integrate with your tools
+Terminal 2, from the repository root:
 
-* [Set up project integrations](https://gitlab.com/personal-group7320947/boardom/-/settings/integrations)
+```bash
+cd frontend
+npm run dev
+```
 
-## Collaborate with your team
+- Application: **http://localhost:3000**
+- API docs: **http://127.0.0.1:8000/docs**
+- API health: **http://127.0.0.1:8000/health**
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+Use `localhost` in the browser consistently. `127.0.0.1:3000` is a different origin and is rejected by the default CSRF configuration. If port 3000 is occupied, stop the other server or set the frontend origin to match the actual port. Next’s same-origin rewrite forwards `/api/v1/*` to FastAPI; browser code uses relative URLs only.
 
-## Test and Deploy
+To run the production frontend locally:
 
-Use the built-in continuous integration in GitLab.
+```bash
+cd frontend
+npm run build
+npm run start
+```
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+The backend must also be running. `BACKEND_URL` is read by Next’s server configuration; rebuild if changing it for a production build.
 
-***
+## Configuration and storage
 
-# Editing this README
+Copy the example environment files before editing them. Never commit real `.env` files.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+| Backend setting | Default | Purpose |
+| --- | --- | --- |
+| `BOARDOM_DATABASE_URL` | `sqlite:///data/boardom.db` | SQLAlchemy database URL |
+| `BOARDOM_UPLOAD_DIR` | `data/uploads` | Private file storage |
+| `BOARDOM_MAX_UPLOAD_BYTES` | `10485760` | 10 MiB per file |
+| `BOARDOM_SESSION_LIFETIME_SECONDS` | `604800` | Seven days, fixed expiry |
+| `BOARDOM_COOKIE_SECURE` | `false` | Set `true` for HTTPS deployments |
+| `BOARDOM_FRONTEND_ORIGIN` | `http://localhost:3000` | Exact allowed browser Origin |
+| `BOARDOM_ENVIRONMENT` | `development` | `development`, `test`, or `production` |
 
-## Suggestions for a good README
+Backend `.env` and relative database/upload paths are resolved from `backend/`, independently of the launch directory. Defaults store the database at `backend/data/boardom.db` and source files in `backend/data/uploads/`. These paths, SQLite sidecars, caches, and virtual environments are ignored by Git. UUIDs identify resources. Timestamps are stored as UTC and serialized with an explicit UTC timezone.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+Frontend `BACKEND_URL` defaults to `http://127.0.0.1:8000`; it is server-side only. The UI retrieves only the non-sensitive file-size limit through `GET /api/v1/config`. If you increase the backend limit, increase `experimental.proxyClientMaxBodySize` in `frontend/next.config.ts` above that limit plus multipart overhead (currently 12 MB for a 10 MiB file), and restart/rebuild Next.
 
-## Name
-Choose a self-explaining name for your project.
+## Authentication and request security
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+Registration **logs the educator in immediately**. Emails are trimmed, lowercased, validated, and unique. Passwords are 8–128 characters and stored as Argon2id hashes. Login uses a generic invalid-credentials error.
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+A random opaque token is sent only in an HttpOnly cookie with `SameSite=Lax`, `Path=/`, explicit expiry, and configurable `Secure`. Only its SHA-256 hash is stored in the sessions table. Logging in rotates the current browser session; logout deletes the server-side session and clears the cookie. Expired sessions are rejected. Tokens are never stored in localStorage or returned in JSON. API responses are marked `Cache-Control: no-store`.
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+**CSRF defense:** every POST, PATCH, PUT, and DELETE must have an `Origin` header exactly equal to `BOARDOM_FRONTEND_ORIGIN`, including registration and login. Missing, `null`, and untrusted origins receive 403. No credentialed CORS is enabled. CLI/API clients must send that Origin explicitly as well. API docs are useful for schemas and reads; mutating requests from the backend docs origin are intentionally rejected. Example health check:
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```bash
+curl http://127.0.0.1:8000/health
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+All workspace/document operations require a valid session and check ownership. Other users’ resources return 404. Downloads are authenticated attachment responses, not public file URLs.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+## Upload and deletion behavior
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+- One file per multipart request: `.pdf`, `.md`, or `.txt` (extension case-insensitive).
+- Empty, oversized, unsupported, invalid UTF-8, and invalid PDF-signature uploads are rejected.
+- File size is checked incrementally as bytes are copied, independently of Content-Length.
+- PDF validation checks the `%PDF-` signature only; no parsing, extraction, or malware scanning is performed.
+- Filenames are metadata. Random server-generated storage keys determine filesystem paths.
+- Failed validation or database insertion removes partial/new files.
+- Deleting documents or workspaces removes metadata and associated files.
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+Deletion first stages files with a `.delete-<operation-id>-<storage-key>` name in the same directory. A filesystem or database failure before commit restores staged files and retains metadata. Missing files produce 409; storage failures produce 503. If metadata commits but final unlinking fails, the response explicitly reports incomplete cleanup (503); it does not claim success.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+SQLite and the filesystem cannot share an atomic transaction. A process crash can leave orphan files or staged deletion files. For recovery, stop writes and back up the database and upload directory together. For each staged file, its final 32-character suffix is the original storage key: if a `source_documents` row still references that key, restore the file to that key; otherwise remove the orphan after confirming the metadata deletion. A post-commit cleanup error can leave an outdated list onscreen until refresh.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+## Checks
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+Backend, from `backend/`:
 
-## License
-For open source projects, say how it is licensed.
+```bash
+uv run pytest -q
+uv run ruff check .
+uv run ruff format --check .
+uv run alembic check
+```
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Integration tests apply the initial Alembic migration to a fresh temporary database and use temporary uploads for each test. They cover authentication, expiry, rotation, duplicate emails, validation, CSRF, ownership, CRUD, downloads, file cleanup, missing files, and failure rollback. No external services or development records are needed.
+
+To explicitly test a new development-style database (POSIX shell):
+
+```bash
+BOARDOM_DATABASE_URL=sqlite:///data/migration-smoke.db uv run alembic upgrade head
+```
+
+Frontend, from `frontend/`:
+
+```bash
+npm run lint
+npm run typecheck
+npm run format:check
+npm run build
+```
+
+`npm run typecheck` generates Next route types before running TypeScript, so it works before the first build. `npm run format` formats frontend source. ESLint uses the Next, React Hooks, and TypeScript plugins directly to keep the lint dependency set compatible with ESLint 10.
+
+## Manual smoke test
+
+1. Start both services and open http://localhost:3000.
+2. Register with a display name, email, and password. Confirm the dashboard appears.
+3. Create a lesson workspace. Set subject, learner level, duration, and description.
+4. Upload a small UTF-8 `.txt` or `.md` file and a PDF. Confirm **Uploaded**, filename, size, and date.
+5. Refresh. Confirm the workspace and files persist.
+6. Download a source and compare it to the original.
+7. Edit the workspace; clear the optional description and change duration. Refresh to confirm persistence.
+8. Delete a document, confirming the dialog. Delete a workspace with another file attached.
+9. Log out. A direct dashboard/workspace visit should redirect to login. Log in and confirm remaining work is saved.
+10. Register another account in a private browser window. The first account’s workspace and download URLs must be inaccessible.
+11. Try an empty file, wrong extension, fake PDF, and file over 10 MiB; confirm clear errors.
+
+## Verified in this workspace
+
+- 35 backend integration tests passed, including a fresh migrated database per test.
+- Ruff lint and formatting, Alembic schema-drift check, frontend lint, TypeScript, Prettier, and production build passed.
+- Browser smoke test passed: register → create workspace → upload Markdown → refresh → download → edit duration → refresh → logout → protected-page redirect → login and reopen saved work. Downloaded bytes matched the source file.
+- Document/workspace deletion and cross-user access were verified by backend integration tests.
+
+The installed Starlette version emits a deprecation warning for its `httpx` TestClient adapter; the tests pass. In this restricted execution environment, TestClient and Next’s build subprocesses required running outside the sandbox. This is an environment restriction, not a required deployment mode.
+
+## Deployment limitations
+
+This is a local hackathon foundation. SQLite serializes writes, and files live on one machine. Use persistent storage, back up the database and uploads together, and avoid multiple application instances sharing an unmanaged filesystem. A deployment needs HTTPS, secure cookies, the exact public frontend origin, and request-body limits on the reverse proxy. Starlette may spool multipart data before the route’s incremental file-size check, so infrastructure-level body limits are needed for untrusted public traffic.
+
+There is no password reset, email verification, rate limiting, account deletion, storage quota, expired-session pruning job, or pagination yet. Those operational features should be added before a public launch. No AI or content-processing layer is implemented.
