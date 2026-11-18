@@ -282,7 +282,10 @@ def test_settings_paths_are_launch_directory_independent(tmp_path, monkeypatch):
 
 def test_health_and_limit(client):
     assert client.get("/health").json() == {"status": "ok"}
-    assert client.get("/api/v1/config").json() == {"max_upload_bytes": 128}
+    assert client.get("/api/v1/config").json() == {
+        "max_upload_bytes": 128,
+        "allow_public_signup": True,
+    }
 
 
 def test_partial_delete_staging_restores_earlier_files(signed_in, app):

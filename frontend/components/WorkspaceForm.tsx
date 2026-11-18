@@ -20,6 +20,7 @@ export function WorkspaceForm({
       subject: "",
       learner_level: "introductory",
       lesson_duration_minutes: 40,
+      has_lab: false,
     },
   );
   function submit(event: FormEvent) {
@@ -27,6 +28,7 @@ export function WorkspaceForm({
     void onSave({
       learner_level: value.learner_level,
       lesson_duration_minutes: value.lesson_duration_minutes,
+      has_lab: !!value.has_lab,
       title: value.title.trim(),
       description: value.description?.trim() || null,
       subject: value.subject?.trim() || null,
@@ -90,6 +92,18 @@ export function WorkspaceForm({
             />
           </label>
         </div>
+        <label>
+          <span className="check-row inline-check">
+            <input
+              type="checkbox"
+              checked={!!value.has_lab}
+              onChange={(e) =>
+                setValue({ ...value, has_lab: e.target.checked })
+              }
+            />
+            Has a lab (adds lab manuals)
+          </span>
+        </label>
         <label>
           Description <span className="optional">(optional)</span>
           <textarea

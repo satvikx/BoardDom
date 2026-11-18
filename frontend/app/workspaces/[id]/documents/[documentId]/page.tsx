@@ -311,7 +311,7 @@ export default function Page({
 }) {
   const values = use(params);
   return (
-    <Protected>
+    <Protected roles={["teacher"]}>
       <Editor {...values} />
     </Protected>
   );

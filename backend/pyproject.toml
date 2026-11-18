@@ -6,7 +6,12 @@ requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.1",
     "argon2-cffi>=25.1.0",
+    "chromadb>=1.5.9",
     "fastapi>=0.163.1",
+    "fpdf2>=2.9.0",
+    "imageio-ffmpeg>=0.8.1",
+    "openai>=3.55.0",
+    "pillow>=13.0.0",
     "pydantic-settings>=2.16.3",
     "pydantic[email]>=2.14.3",
     "pypdf>=7.1.0",
@@ -25,6 +30,10 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+filterwarnings = [
+    # Python 3.14 deprecation inside chromadb's telemetry module (third-party, harmless).
+    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning",
+]
 
 [dependency-groups]
 dev = [

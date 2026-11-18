@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { HomeActions } from "@/components/HomeActions";
 export default function Home() {
   return (
     <>
@@ -13,12 +13,7 @@ export default function Home() {
           Give every lesson a home. Organize your ideas, gather your source
           materials, and pick up right where you left off.
         </p>
-        <div className="hero-actions">
-          <Link href="/register" className="button">
-            Create your workspace <span aria-hidden="true">↗</span>
-          </Link>
-          <Link href="/login">Already here? Log in →</Link>
-        </div>
+        <HomeActions />
       </section>
       <section className="feature-grid" aria-label="What you can do">
         <article>

@@ -11,7 +11,22 @@ from sqlalchemy.orm import Session
 from app.models.entities import SourceDocument
 
 logger = logging.getLogger(__name__)
-MEDIA_TYPES = {".pdf": "application/pdf", ".txt": "text/plain", ".md": "text/markdown"}
+MEDIA_TYPES = {
+    ".pdf": "application/pdf",
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
+TEXT_SUFFIXES = {".txt", ".md"}
+SIGNATURES = {
+    ".pdf": (b"%PDF-",),
+    ".png": (b"\x89PNG\r\n\x1a\n",),
+    ".jpg": (b"\xff\xd8\xff",),
+    ".jpeg": (b"\xff\xd8\xff",),
+}
 
 
 class FileStorage:
@@ -45,7 +60,9 @@ class FileStorage:
         suffix = Path(filename).suffix.lower()
         if suffix not in MEDIA_TYPES:
             raise HTTPException(
-                415, "Only PDF, Markdown (.md), and text (.txt) files are supported."
+                415,
+                "Supported files: PDF, Markdown (.md), text (.txt), and images "
+                "(.png, .jpg, .jpeg, .webp).",
             )
         key = uuid4().hex
         path = self.path(key)
@@ -53,16 +70,16 @@ class FileStorage:
         try:
             self.root.mkdir(parents=True, exist_ok=True)
             size = 0
-            decoder = codecs.getincrementaldecoder("utf-8")() if suffix != ".pdf" else None
-            prefix = b""
+            decoder = codecs.getincrementaldecoder("utf-8")() if suffix in TEXT_SUFFIXES else None
+            prefix = b""  # first 12 bytes, for the file signature check
             with path.open("xb") as destination:
                 created = True
                 while chunk := upload.file.read(64 * 1024):
                     size += len(chunk)
                     if size > self.max_bytes:
                         raise HTTPException(413, f"File exceeds the {self.max_bytes} byte limit.")
-                    if len(prefix) < 5:
-                        prefix = (prefix + chunk)[:5]
+                    if len(prefix) < 12:
+                        prefix = (prefix + chunk)[:12]
                     if decoder:
                         decoder.decode(chunk)
                     destination.write(chunk)
@@ -70,8 +87,11 @@ class FileStorage:
                     decoder.decode(b"", final=True)
             if size == 0:
                 raise HTTPException(422, "Empty files cannot be uploaded.")
-            if suffix == ".pdf" and prefix != b"%PDF-":
-                raise HTTPException(422, "The file does not have a valid PDF signature.")
+            if suffix in SIGNATURES and not prefix.startswith(SIGNATURES[suffix]):
+                kind = "PDF" if suffix == ".pdf" else "image"
+                raise HTTPException(422, f"The file does not have a valid {kind} signature.")
+            if suffix == ".webp" and not (prefix[:4] == b"RIFF" and prefix[8:12] == b"WEBP"):
+                raise HTTPException(422, "The file does not have a valid image signature.")
             return key, filename, MEDIA_TYPES[suffix], size
         except Exception as exc:
             if created:

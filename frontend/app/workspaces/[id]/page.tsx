@@ -3,14 +3,13 @@ import { use, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Protected, useRequestError } from "@/components/AuthProvider";
-import { WorkspaceForm } from "@/components/WorkspaceForm";
+import { EnrollmentPanel } from "@/components/EnrollmentPanel";
 import {
   api,
   downloadDocument,
   formatDate,
   formatSize,
   type Workspace,
-  type WorkspaceInput,
   type SourceDocument,
 } from "@/lib/api";
 
@@ -24,7 +23,6 @@ function WorkspaceView({ id }: { id: string }) {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [editing, setEditing] = useState(false);
   const [retry, setRetry] = useState(0);
   const base = `/workspaces/${id}`;
   useEffect(() => {
@@ -57,17 +55,22 @@ function WorkspaceView({ id }: { id: string }) {
     setError("");
     setSuccess("");
   }
-  async function save(value: WorkspaceInput) {
-    begin("save");
+  async function pasteText(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    begin("paste");
     try {
-      setWorkspace(
-        await api<Workspace>(base, {
-          method: "PATCH",
-          body: JSON.stringify(value),
+      const document = await api<SourceDocument>(`${base}/documents/text`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: data.get("title"),
+          text: data.get("text"),
         }),
-      );
-      setEditing(false);
-      setSuccess("Workspace details saved.");
+      });
+      setDocuments((current) => [document, ...current]);
+      form.reset();
+      setSuccess("Text saved as a source. It is ready to use.");
     } catch (e) {
       setError(handleError(e));
     } finally {
@@ -194,6 +197,14 @@ function WorkspaceView({ id }: { id: string }) {
             {workspace.description && (
               <p className="description">{workspace.description}</p>
             )}
+            <p className="course-links">
+              <Link
+                className="button small"
+                href={`/workspaces/${id}/syllabus`}
+              >
+                Syllabus &amp; materials <span aria-hidden="true">→</span>
+              </Link>
+            </p>
           </div>
           <div className="workspace-grid">
             <section aria-labelledby="sources-heading">
@@ -204,9 +215,10 @@ function WorkspaceView({ id }: { id: string }) {
               <div className="panel upload-panel">
                 <h3>Bring your lesson materials</h3>
                 <p className="muted" id="upload-help">
-                  PDF, Markdown (.md), or text (.txt). Up to{" "}
-                  {limit === null ? "…" : formatSize(limit)} per file. Text
-                  files must use UTF-8.
+                  PDF (including scans), Markdown, text, or an image (.png,
+                  .jpg, .webp). Up to {limit === null ? "…" : formatSize(limit)}{" "}
+                  per file. Scans and images are read by the AI; in demo mode
+                  they wait for an AI key.
                 </p>
                 <form onSubmit={upload}>
                   <fieldset disabled={!!busy}>
@@ -217,7 +229,7 @@ function WorkspaceView({ id }: { id: string }) {
                       id="source-file"
                       type="file"
                       name="file"
-                      accept=".pdf,.md,.txt"
+                      accept=".pdf,.md,.txt,.png,.jpg,.jpeg,.webp"
                       required
                       aria-describedby="upload-help"
                     />
@@ -226,6 +238,24 @@ function WorkspaceView({ id }: { id: string }) {
                     </button>
                   </fieldset>
                 </form>
+                <details className="paste-source">
+                  <summary>Or paste text</summary>
+                  <form onSubmit={pasteText}>
+                    <fieldset disabled={!!busy}>
+                      <label>
+                        Title
+                        <input name="title" required maxLength={120} />
+                      </label>
+                      <label>
+                        Text
+                        <textarea name="text" required rows={6} />
+                      </label>
+                      <button type="submit">
+                        {busy === "paste" ? "Saving…" : "Add as a source"}
+                      </button>
+                    </fieldset>
+                  </form>
+                </details>
               </div>
               {documents.length === 0 ? (
                 <div className="empty-state compact">
@@ -289,24 +319,19 @@ function WorkspaceView({ id }: { id: string }) {
             <aside>
               <section className="panel">
                 <div className="section-heading">
-                  <h2>Lesson details</h2>
-                  <button
-                    className="text-button"
-                    disabled={!!busy}
-                    onClick={() => setEditing(!editing)}
-                  >
-                    {editing ? "Cancel" : "Edit"}
-                  </button>
+                  <h2>Course details</h2>
+                  <Link className="text-link" href={`/workspaces/${id}/plan`}>
+                    Edit plan
+                  </Link>
                 </div>
-                {editing ? (
-                  <WorkspaceForm
-                    initial={workspace}
-                    busy={!!busy}
-                    onSave={save}
-                    submitLabel="Save changes"
-                  />
-                ) : (
+                {
                   <dl className="detail-list">
+                    <div>
+                      <dt>Lab</dt>
+                      <dd>
+                        {workspace.has_lab ? "Theory + lab" : "Theory only"}
+                      </dd>
+                    </div>
                     <div>
                       <dt>Subject</dt>
                       <dd>{workspace.subject || "Not set"}</dd>
@@ -324,8 +349,9 @@ function WorkspaceView({ id }: { id: string }) {
                       <dd>{formatDate(workspace.created_at)}</dd>
                     </div>
                   </dl>
-                )}
+                }
               </section>
+              <EnrollmentPanel workspaceId={id} />
               <section className="delete-zone">
                 <h3>Delete workspace</h3>
                 <p>
@@ -354,7 +380,7 @@ export default function WorkspacePage({
 }) {
   const { id } = use(params);
   return (
-    <Protected>
+    <Protected roles={["teacher"]}>
       <WorkspaceView id={id} />
     </Protected>
   );

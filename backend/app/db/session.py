@@ -30,8 +30,9 @@ def build_engine(database_url: str):
     return engine
 
 
-def session_factory(engine):
-    return sessionmaker(bind=engine, expire_on_commit=False)
+def session_factory(engine, vector_index=None):
+    """`vector_index` travels with every session (db.info) so services can reach it."""
+    return sessionmaker(bind=engine, expire_on_commit=False, info={"vector_index": vector_index})
 
 
 def get_db(request: Request) -> Generator[Session]:

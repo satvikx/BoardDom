@@ -5,9 +5,10 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from sqlalchemy import select, update
 
 from app.api.documents import owned_document
-from app.core.security import CurrentUser, Db
+from app.core.security import CurrentTeacher, Db
 from app.models.entities import SourceDocument, SourceUnit, utcnow
 from app.schemas.api import ContentOut, DocumentOut, ReviewPatch, UnitOut, UnitPatch
+from app.services.usage import AIQuota
 
 router = APIRouter(
     prefix="/workspaces/{workspace_id}/documents/{document_id}", tags=["Source content"]
@@ -23,7 +24,14 @@ def units(db, document_id):
 
 
 @router.post("/extract", response_model=DocumentOut, status_code=202)
-def start(workspace_id: UUID, document_id: UUID, request: Request, db: Db, user: CurrentUser):
+def start(
+    workspace_id: UUID,
+    document_id: UUID,
+    request: Request,
+    db: Db,
+    user: CurrentTeacher,
+    quota: AIQuota,
+):
     _, doc = owned_document(db, workspace_id, document_id, user.id)
     if doc.extraction_status not in {"uploaded", "failed", "needs_ocr"}:
         raise HTTPException(
@@ -64,7 +72,7 @@ def start(workspace_id: UUID, document_id: UUID, request: Request, db: Db, user:
 
 
 @router.get("/content", response_model=ContentOut)
-def content(workspace_id: UUID, document_id: UUID, db: Db, user: CurrentUser):
+def content(workspace_id: UUID, document_id: UUID, db: Db, user: CurrentTeacher):
     _, doc = owned_document(db, workspace_id, document_id, user.id)
     return dict(document=doc, units=units(db, document_id))
 
@@ -93,7 +101,7 @@ def correct(
     data: UnitPatch,
     request: Request,
     db: Db,
-    user: CurrentUser,
+    user: CurrentTeacher,
 ):
     _, doc = owned_document(db, workspace_id, document_id, user.id)
     unit = db.scalar(
@@ -128,7 +136,7 @@ def correct(
 
 
 @router.patch("/review", response_model=DocumentOut)
-def review(workspace_id: UUID, document_id: UUID, data: ReviewPatch, db: Db, user: CurrentUser):
+def review(workspace_id: UUID, document_id: UUID, data: ReviewPatch, db: Db, user: CurrentTeacher):
     _, doc = owned_document(db, workspace_id, document_id, user.id)
     lock_content(db, doc, data.expected_content_revision)
     if data.reviewed and not any(u.effective_text.strip() for u in units(db, doc.id)):
@@ -140,7 +148,7 @@ def review(workspace_id: UUID, document_id: UUID, data: ReviewPatch, db: Db, use
 
 
 @router.get("/content/download")
-def export(workspace_id: UUID, document_id: UUID, db: Db, user: CurrentUser):
+def export(workspace_id: UUID, document_id: UUID, db: Db, user: CurrentTeacher):
     _, doc = owned_document(db, workspace_id, document_id, user.id)
     if doc.extraction_status != "extracted":
         raise HTTPException(409, "Extract text successfully before exporting.")

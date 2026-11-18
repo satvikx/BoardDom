@@ -2,7 +2,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api, errorMessage, type User } from "@/lib/api";
+import { api, errorMessage, homeFor, type User } from "@/lib/api";
 import { useAuth } from "./AuthProvider";
 
 export function AuthForm({
@@ -12,7 +12,7 @@ export function AuthForm({
   register?: boolean;
   expired?: boolean;
 }) {
-  const { setUser } = useAuth();
+  const { setUser, config } = useAuth();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -32,13 +32,36 @@ export function AuthForm({
         body: JSON.stringify(body),
       });
       setUser(user);
-      router.push("/dashboard");
+      router.push(homeFor(user));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
   }
+  if (register && config && !config.allow_public_signup)
+    return (
+      <div className="auth-layout">
+        <section className="auth-intro">
+          <p className="eyebrow">Accounts by invitation</p>
+          <h1>Sign-up is turned off.</h1>
+          <p>
+            Your administrator creates teacher accounts, and teachers create
+            student accounts.
+          </p>
+        </section>
+        <section className="panel auth-panel">
+          <h2>Already have an account?</h2>
+          <p className="muted">
+            Use the email and temporary password you were given. You will choose
+            your own password after logging in.
+          </p>
+          <Link className="button full-width" href="/login">
+            Log in
+          </Link>
+        </section>
+      </div>
+    );
   return (
     <div className="auth-layout">
       <section className="auth-intro">
@@ -115,12 +138,19 @@ export function AuthForm({
             </button>
           </fieldset>
         </form>
-        <p className="auth-switch">
-          {register ? "Already have an account?" : "New to Boardom?"}{" "}
-          <Link href={register ? "/login" : "/register"}>
-            {register ? "Log in" : "Create an account"}
-          </Link>
-        </p>
+        {(register || config?.allow_public_signup) && (
+          <p className="auth-switch">
+            {register ? "Already have an account?" : "New to Boardom?"}{" "}
+            <Link href={register ? "/login" : "/register"}>
+              {register ? "Log in" : "Create an account"}
+            </Link>
+          </p>
+        )}
+        {!register && (
+          <p className="auth-switch">
+            <Link href="/admin-reset">Forgot admin password?</Link>
+          </p>
+        )}
       </section>
     </div>
   );

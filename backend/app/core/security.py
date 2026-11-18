@@ -55,7 +55,8 @@ def create_session(db: Session, user: User, request: Request, response: Response
     )
 
 
-def current_user(request: Request, db: Db) -> User:
+def authenticated_user(request: Request, db: Db) -> User:
+    """Any signed-in user, including one who still has to change a temporary password."""
     token = request.cookies.get(COOKIE_NAME)
     session = (
         db.scalar(
@@ -72,4 +73,32 @@ def current_user(request: Request, db: Db) -> User:
     return user
 
 
+AuthenticatedUser = Annotated[User, Depends(authenticated_user)]
+
+
+def current_user(user: AuthenticatedUser) -> User:
+    if user.must_change_password:
+        raise HTTPException(403, "Change your temporary password before continuing.")
+    return user
+
+
 CurrentUser = Annotated[User, Depends(current_user)]
+
+ROLE_AREAS = {"admin": "administrators", "teacher": "teachers", "student": "students"}
+
+
+def require_role(*roles: str):
+    areas = " and ".join(ROLE_AREAS[r] for r in roles)
+
+    def dependency(user: CurrentUser) -> User:
+        if user.role not in roles:
+            raise HTTPException(403, f"Not allowed: this area is only for {areas}.")
+        return user
+
+    return dependency
+
+
+CurrentAdmin = Annotated[User, Depends(require_role("admin"))]
+CurrentTeacher = Annotated[User, Depends(require_role("teacher"))]
+CurrentStudent = Annotated[User, Depends(require_role("student"))]
+CurrentStaff = Annotated[User, Depends(require_role("teacher", "admin"))]
